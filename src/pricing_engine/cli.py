@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
 
+from pricing_engine.greeks import compute_greeks
 from pricing_engine.implied_vol import ImpliedVolError, implied_volatility
 from pricing_engine.models import ExerciseStyle, Market, Option, OptionType, ValidationError
 from pricing_engine.pricers import UnsupportedContractError
@@ -30,14 +31,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pricing-engine", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    price = sub.add_parser("price", help="price an option")
-    _add_contract_args(price, need_vol=True)
-    price.add_argument("--model", choices=available_models(), default="black_scholes")
-    price.add_argument("--steps", type=int, help="binomial tree steps")
-    price.add_argument("--paths", type=int, help="Monte Carlo paths")
-    price.add_argument("--seed", type=int, help="Monte Carlo seed")
-    price.add_argument("--antithetic", action=argparse.BooleanOptionalAction)
-    price.add_argument("--control-variate", action=argparse.BooleanOptionalAction)
+    for command, help_text in (("price", "price an option"), ("greeks", "compute Greeks")):
+        model_parser = sub.add_parser(command, help=help_text)
+        _add_contract_args(model_parser, need_vol=True)
+        model_parser.add_argument("--model", choices=available_models(), default="black_scholes")
+        model_parser.add_argument("--steps", type=int, help="binomial tree steps")
+        model_parser.add_argument("--paths", type=int, help="Monte Carlo paths")
+        model_parser.add_argument("--seed", type=int, help="Monte Carlo seed")
+        model_parser.add_argument("--antithetic", action=argparse.BooleanOptionalAction)
+        model_parser.add_argument("--control-variate", action=argparse.BooleanOptionalAction)
 
     iv = sub.add_parser("iv", help="solve for implied volatility")
     _add_contract_args(iv, need_vol=False)
@@ -60,6 +62,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "iv":
         return {"implied_volatility": implied_volatility(args.target_price, option, market)}
     model_kwargs = {k: v for k in MODEL_OPTION_NAMES if (v := getattr(args, k)) is not None}
+    if args.command == "greeks":
+        greeks, method = compute_greeks(option, market, args.model, **model_kwargs)
+        return {"model": args.model, "method": method, **asdict(greeks)}
     return asdict(get_pricer(args.model, **model_kwargs).price(option, market))
 
 

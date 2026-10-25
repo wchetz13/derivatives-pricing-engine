@@ -10,9 +10,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from pricing_engine import __version__
+from pricing_engine.greeks import compute_greeks
 from pricing_engine.implied_vol import ImpliedVolError, implied_volatility
 from pricing_engine.models import ExerciseStyle, Market, Option, OptionType, ValidationError
-from pricing_engine.pricers import BlackScholesPricer, UnsupportedContractError
+from pricing_engine.pricers import UnsupportedContractError
 from pricing_engine.registry import MODEL_OPTION_NAMES, available_models, get_pricer
 
 app = FastAPI(
@@ -43,7 +44,7 @@ class ContractIn(BaseModel):
 
 class PriceIn(ContractIn):
     model: Literal["black_scholes", "binomial", "monte_carlo"] = "black_scholes"
-    steps: Annotated[int, Field(ge=1, le=10_000)] | None = None
+    steps: Annotated[int, Field(ge=2, le=10_000)] | None = None
     paths: Annotated[int, Field(ge=2, le=2_000_000)] | None = None
     seed: int | None = None
     antithetic: bool | None = None
@@ -79,9 +80,11 @@ def price(body: PriceIn) -> dict[str, Any]:
 
 
 @app.post("/greeks")
-def greeks(body: ContractIn) -> dict[str, float]:
+def greeks(body: PriceIn) -> dict[str, Any]:
     option, market = body.to_domain()
-    return asdict(BlackScholesPricer().greeks(option, market))
+    kwargs = {k: v for k in MODEL_OPTION_NAMES if (v := getattr(body, k)) is not None}
+    result, method = compute_greeks(option, market, body.model, **kwargs)
+    return {"model": body.model, "method": method, **asdict(result)}
 
 
 @app.post("/implied-vol")

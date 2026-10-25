@@ -80,10 +80,10 @@ def test_american_call_without_dividends_equals_european(market: Market, call: O
 
 def test_binomial_rejects_bad_configuration(market: Market, call: Option) -> None:
     with pytest.raises(ValidationError):
-        BinomialPricer(steps=0)
+        BinomialPricer(steps=1)
     high_rate = Market(100.0, rate=2.0, volatility=0.01)
     with pytest.raises(ValidationError, match="increase steps"):
-        BinomialPricer(steps=1).price(call, high_rate)
+        BinomialPricer(steps=2).price(call, high_rate)
 
 
 def test_monte_carlo_is_within_three_standard_errors(market: Market, call: Option) -> None:

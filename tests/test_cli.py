@@ -41,6 +41,15 @@ def test_implied_vol(capsys: pytest.CaptureFixture[str]) -> None:
     assert json.loads(out)["implied_volatility"] == pytest.approx(0.2, abs=1e-6)
 
 
+def test_greeks_command(capsys: pytest.CaptureFixture[str]) -> None:
+    argv = [*BASE, "--vol", "0.2", "--model", "binomial", "--steps", "300"]
+    code, out, _ = run(capsys, "greeks", *argv)
+    assert code == 0
+    result = json.loads(out)
+    assert result["method"] == "lattice"
+    assert result["delta"] == pytest.approx(0.6368, abs=1e-3)
+
+
 def test_models(capsys: pytest.CaptureFixture[str]) -> None:
     code, out, _ = run(capsys, "models")
     assert code == 0
