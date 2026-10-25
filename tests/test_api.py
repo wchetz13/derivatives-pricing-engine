@@ -33,7 +33,8 @@ def test_price(extra: dict[str, object], expected: float) -> None:
 
 def test_greeks() -> None:
     body = client.post("/greeks", json=CONTRACT).json()
-    assert set(body) == {"delta", "gamma", "vega", "theta", "rho"}
+    assert set(body) == {"model", "method", "delta", "gamma", "vega", "theta", "rho"}
+    assert body["method"] == "analytic"
     assert body["delta"] == pytest.approx(0.6368, abs=1e-4)
 
 
@@ -62,3 +63,10 @@ def test_invalid_requests_return_422(payload: dict[str, object]) -> None:
 def test_implied_vol_outside_bounds_returns_422() -> None:
     response = client.post("/implied-vol", json=CONTRACT | {"price": 500})
     assert response.status_code == 422
+
+
+def test_greeks_for_american_option_on_tree() -> None:
+    payload = CONTRACT | {"option_type": "put", "style": "american", "model": "binomial"}
+    body = client.post("/greeks", json=payload).json()
+    assert body["method"] == "lattice"
+    assert -1 < body["delta"] < 0
